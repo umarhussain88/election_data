@@ -1,5 +1,7 @@
 import scrapy
 import logging
+from datetime import datetime
+from pathlib import Path
 
 
 class ElectionSpider(scrapy.Spider):
@@ -7,10 +9,17 @@ class ElectionSpider(scrapy.Spider):
     allowed_domains = ['elezionistorico.interno.gov.it']
     start_urls = ['https://elezionistorico.interno.gov.it/index.php?tpel=R']
     parent_url = 'http://elezionistorico.interno.gov.it'
+
+    log_dir = Path(__file__).parent.parent.joinpath('logs')
+    if not log_dir.is_dir():
+        log_dir.mkdir(parents=True) 
+
+
     logging.basicConfig(
-        filename='log.txt',
-        format='%(levelname)s: %(message)s',
-        level=logging.ERROR
+        filename=log_dir.joinpath(f"{datetime.now().strftime('%d%m%y_%H%M%S')}_log.txt"),
+        format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+        datefmt='%H:%M:%S',
+        level=logging.WARNING
     )
 
     headers = {
@@ -27,17 +36,12 @@ class ElectionSpider(scrapy.Spider):
     'Accept-Language': 'en-US,en;q=0.9',
     }
 
-
-    def ignore_index_errors(self,data,n):
+    @staticmethod
+    def ignore_index_errors(data,n):
         try:
             return data[n]
         except IndexError:
             return None
-
-
-
-
-
 
 
     def parse(self,response): #dates.
@@ -47,22 +51,17 @@ class ElectionSpider(scrapy.Spider):
 
             yield scrapy.Request(
                 self.parent_url + item.xpath('a/@href').extract()[0].replace('/?','?') + '&tpa=I&tpe=A&lev0=0&levsut0=0&es0=S&ms=N',
-                callback=self.parse_region,headers=self.headers)
+                callback=self.parse_region,headers=self.headers)                          # ^ date + regional level
 
-
-    # def parse_country(self,response):
-
-    #     italy  = response.xpath('//li/a[@title="ITALIA"]/@href').extract()[0].replace('/?','?')
-    #     yield scrapy.Request(
-    #             self.parent_url + italy,
-    #             callback=self.parse_regions)
 
 
     def parse_region(self,response):
+
         regions = response.xpath('//div[@id="collapseFour"]/div/div/ul/li')
         for region in regions:
             yield scrapy.Request(self.parent_url + region.xpath('a/@href').extract()[0],
             callback=self.parse_district, meta={'region' : region.xpath('a/text()').extract()[0]},headers=self.headers)
+
 
     def parse_district(self,response):
         districts = response.xpath('//div[@class="panel-collapse collapse in"]/div/div/ul/li')
@@ -86,7 +85,6 @@ class ElectionSpider(scrapy.Spider):
                 pass
             
 
-
     def electoral_data(self,response):
 
         table = response.xpath('//tr')
@@ -103,32 +101,5 @@ class ElectionSpider(scrapy.Spider):
                 'src_url' : response.url,
                 'region' : response.meta['region'],
                 'area' : response.meta['area'],
-                'district' : response.meta['district']
-
-
+                'district' : response.meta['district'] 
             }
-            # except IndexError:
-            #     yield { 
-
-            #         'Candidati' : items.xpath('th/text()').extract()[0],
-            #         'Data di nascita' : items.xpath('td/text()').extract()[0],
-            #         'Luogo di nascita' : items.xpath('td/text()').extract()[1],
-            #         'Preferenze' : items.xpath('td/text()').extract()[2],
-            #         'Eletto' : None,
-            #         'src_url' : response.url,
-            #         'region' : response.meta['region'],
-            #         'area' : response.meta['area'],
-            #         'district' : response.meta['district']
-            #     }
-
-            
-
-
-
-
-
-            
-            
-
-    
-

@@ -1,2 +1,6 @@
 *.json
 log.txt
+/venv*
+*.csv
+election_data/logs/*
+*.pyc
